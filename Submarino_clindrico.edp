@@ -1,0 +1,91 @@
+//Estudio del flujo de agua para distitnos tipos de perfiles de submarino versión:1.0.0
+//José Luis Conde Chamizo
+
+
+//Libería para ver los resultados en Paraview
+load "iovtk"
+int npuntos = 10;
+//Datos del contorno del mallado
+real malladox1 = 130000, malladox2 = -50000, malladoy1 = 50000, malladoy2 = -50000;
+border l1 (t = malladox1, malladox2){x = t ; y = 50000;}
+border l2 (t = malladoy2, malladoy1){x = 130000 ; y = t;}
+border l3 (t = malladox2, malladox1){x = t ; y = -50000;}
+border l4 (t = malladoy1, malladoy2){x = -50000 ; y = t;}
+
+
+//Función para representar lineas rectas en el modelo
+func real recta (real a1, real b1, real a2, real b2, real c){
+    return ((b1-b2)/(a1-a2))*(c-a1)+b1;
+}
+
+
+//Puntos morro plano
+real x1 = 0, y1 = 600;
+real x2= 16000, y2 = 4150;
+real x3 = 44800, y3 = 4150;   
+real x4 = 46000, y4 = 9150; 
+real x5 = 56000, y5 = 9150;
+real x6 = 56000, y6 = 4150;
+real x7 = 80000, y7 = 4150; 
+
+
+border afttop (t = x1, x2) {x = t; y = recta(x1,y1,x2,y2,t);}
+border top1 (t = x2, x3) {x = t; y = y2;}
+border velaaft (t = x3, x4) {x = t; y = recta(x3,y3,x4,y4,t);}
+border velatop (t = x4, x5) {x = t; y = y5;}
+border velafwd (t = y5, y6) {x = x6; y = t;}
+border fwdtop (t = x6, x7) {x = t; y = y7;}
+border fwd (t = y7, -y7) { x = x7; y = t;}
+border bottom (t = x7, x2) {x = t; y = -y2;}
+border aftbottom (t = x2, x1) {x = t; y = recta(x2,-y2,x1,-y1,t);}
+border aft (t = -y1, y1) {x = x1; y = t;}
+
+
+mesh Th = buildmesh (afttop(npuntos)
++ top1(npuntos)
++ velaaft(npuntos)
++ velatop(npuntos)
++ velafwd(npuntos)
++ fwdtop(npuntos)
++ fwd(npuntos)
++ bottom(npuntos)
++ aftbottom(npuntos)
++ aft(npuntos)
++ l1(npuntos)
++ l2(npuntos)
++ l3(npuntos)
++ l4(npuntos)
+);
+
+// Espacio finito
+fespace Vh(Th, P2);
+Vh psi, w;
+
+//Macro Gradiente
+macro grad(u) [dx(u),dy(u)]// 
+
+// Solución tipo 1
+solve potential(psi, w) = int2d(Th)(grad(psi)'*grad(w))
++ on(l1, psi = y)
++ on(l2, psi = y)
++ on(l3, psi = y)
++ on(l4, psi = y)
++ on (afttop, psi = 0)
++ on (top1, psi = 0)
++ on (velaaft, psi = 0)
++ on (velatop, psi = 0)
++ on (velafwd, psi = 0)
++ on (fwdtop , psi = 0)
++ on (fwd, psi = 0)
++ on (bottom, psi = 0)
++ on (aftbottom, psi = 0)
++ on (aft, psi = 0)
+;
+
+plot (psi, wait = 1);
+
+//Cálculo de las velocidades
+Vh u,v;
+u = dy(psi);
+v = -dx (psi);
+plot ([u,v], wait = 1);
