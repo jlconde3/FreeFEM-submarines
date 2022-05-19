@@ -1,0 +1,107 @@
+//Libería para ver los resultados en Paraview
+load "iovtk"
+
+//Puntos en la malla
+int npuntos = 10;
+
+//Datos del volumen de control
+real malladox1 = 130000, malladox2 = -50000, malladoy1 = 50000, malladoy2 = -50000;
+border l1 (t = malladox1, malladox2){x = t ; y = 50000;}
+border l2 (t = malladoy2, malladoy1){x = 130000 ; y = t;}
+border l3 (t = malladox2, malladox1){x = t ; y = -50000;}
+border l4 (t = malladoy1, malladoy2){x = -50000 ; y = t;}
+
+//Función para representar lineas rectas en el modelo
+func real recta (real a1, real b1, real a2, real b2, real c){
+    return ((b1-b2)/(a1-a2))*(c-a1)+b1;
+}
+
+//Puntos morro esférico
+real x1 = 0, y1 = 600;
+real x2= 16000, y2 = 4150;
+real x3 = 44800, y3 = 4150;   
+real x4 = 46000, y4 = 9150; 
+real x5 = 56000, y5 = 9150;
+real x6 = 56000, y6 = 4150; 
+real x7 = 75850, y7 = 4150;
+real x8 = 80000, y8 = 0;
+
+border afttop (t = x1, x2) {x = t; y = recta(x1,y1,x2,y2,t);}
+border top1 (t = x2, x3) {x = t; y = y2;}
+border velaaft (t = x3, x4) {x = t; y = recta(x3,y3,x4,y4,t);}
+border velatop (t = x4, x5) {x = t; y = y5;}
+border velafwd (t = y5, y6) {x = x6; y = t;}
+border fwdtop (t = x6, x7) {x = t; y = y7;}
+border fwd (t = pi/2, 3*pi/2) {x = x7-y7*cos(t); y = y7*sin (t);}
+border bottom (t = x7, x2) {x = t; y = -y2;}
+border aftbottom (t = x2, x1) {x = t; y = recta(x2,-y2,x1,-y1,t);}
+border aft (t = -y1, y1) {x = x1; y = t;}
+
+
+mesh Th = buildmesh (afttop(npuntos)
++ top1(npuntos)
++ velaaft(npuntos)
++ velatop(npuntos)
++ velafwd(npuntos)
++ fwd(npuntos)
++ fwdtop(npuntos)
++ bottom(npuntos)
++ aftbottom(npuntos)
++ aft(npuntos)
++ l1(npuntos)
++ l2(npuntos)
++ l3(npuntos)
++ l4(npuntos)
+);
+
+
+// Espacio finito de tipo Taylor-Hood P2/P1
+fespace Vh(Th, P2);
+fespace Ph(Th, P1);
+Vh u1, u2; // Incóginta velocidad
+Vh v1, v2; // F. test velicidad
+Ph p, q; // Incógnita f. test presión
+
+//Macro Gradiente
+macro grad(u) [dx(u),dy(u)]//
+//Macro Divergencia de un campo de velocidades [u1, u2]
+macro div(u1, u2) (dx(u1)+dy(u2)) // Fin de macro
+
+// Fuente: https://es.wikipedia.org/wiki/Submarino
+// Velocidad en inemrsión 25 nudos = 12861 mm/s
+func vEntrada = -12861; 
+
+// Solución
+solve Stokes([u1, u2, p], [v1, v2, q]) =
+    int2d(Th)(grad(u1)'*grad(v1) + grad(u2)'*grad(v2))
+    - int2d(Th)(p*div(v1, v2))
+    - int2d(Th)(q*div(u1, u2))
+    + int2d(Th)(1.e-12*p*q)
+    //Condiciones en la frorntera
+    + on(l1, u1=vEntrada, u2=0)
+    + on(l2, u1=vEntrada, u2=0)
+    + on(l3, u1=vEntrada, u2=0)
+    // Condiciones de contorno en el modelo
+    + on (afttop, u1=0, u2=0)
+    + on (top1, u1=0, u2=0)
+    + on (velaaft, u1=0, u2=0)
+    + on (velatop, u1=0, u2=0)
+    + on (velafwd, u1=0, u2=0)
+    + on (fwdtop , u1=0, u2=0)
+    + on (fwd, u1=0, u2=0)
+    + on (bottom, u1=0, u2=0)
+    + on (aftbottom, u1=0, u2=0)
+    + on (aft, u1=0, u2=0)
+;
+
+plot ([u1,u2], wait = 1, value=1);
+plot (p, wait = 1, fill=1, value=1);
+
+int [int] Order = [1];
+//Exportación gráfica de la presión en ParaView
+string DataP = "Presi'on";
+savevtk("SubEsfericoStokesP.vtu", Th, p, dataname=DataP, order=Order);
+
+//Exportación gráfica de la velocidad en ParaView
+string DataU = "Velocidad";
+savevtk("SubEsfericoStokesU.vtu", Th, [u1,u2], dataname=DataU, order=Order);
