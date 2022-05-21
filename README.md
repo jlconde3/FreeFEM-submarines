@@ -1,4 +1,4 @@
-# Estudio hidrodinámico de distitntos Submarinos
+# Estudio hidrodinámico de distintos Submarinos
 
 ## Objetivo del Proyecto
 
